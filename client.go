@@ -79,7 +79,7 @@ func (g *GoCloak) compareVersions(v, token string, ctx context.Context) (int, er
 		v = "v" + v
 	}
 
-	return semver.Compare(curVersion, v), nil
+	return semver.Compare(v, curVersion), nil
 }
 
 // Get the server version from the serverinfo endpoint.
@@ -1141,6 +1141,28 @@ func (g *GoCloak) GetClientRepresentation(ctx context.Context, accessToken, real
 	}
 
 	return &result, nil
+}
+
+// GetClientRepresentation returns a client representation
+func (g *GoCloak) GetClientRepresentationByClientID(ctx context.Context, accessToken, realm, clientID string) (*Client, error) {
+	const errMessage = "could not get client representation by clientID"
+
+	var result []Client
+
+	resp, err := g.GetRequestWithBearerAuth(ctx, accessToken).
+		SetResult(&result).
+		SetQueryParam("clientId", clientID).
+		SetQueryParam("viewableOnly", "true").
+		Get(g.getAdminRealmURL(realm, "clients"))
+
+	if err := checkForError(resp, err, errMessage); err != nil {
+		return nil, err
+	}
+
+	if len(result) > 0 {
+		return &result[0], nil
+	}
+	return &Client{}, nil
 }
 
 // GetAdapterConfiguration returns a adapter configuration
@@ -3372,6 +3394,16 @@ func (g *GoCloak) GetResourceServer(ctx context.Context, token, realm, idOfClien
 	}
 
 	return result, nil
+}
+
+func (g *GoCloak) ImportResourceServer(ctx context.Context, token, realm, idOfClient string, resourceServer ResourceServerRepresentation) error {
+	const errMessage = "could not get resource server settings"
+
+	resp, err := g.GetRequestWithBearerAuth(ctx, token).
+		SetBody(resourceServer).
+		Post(g.getAdminRealmURL(realm, "clients", idOfClient, "authz", "resource-server", "import"))
+
+	return checkForError(resp, err, errMessage)
 }
 
 // UpdateResource updates a resource associated with the client, using access token from admin
